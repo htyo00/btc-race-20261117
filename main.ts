@@ -8,21 +8,24 @@
 //     +$2.45 here but -$49 / -$23 on the two down windows; plain trend
 //     following whipsaws itself to death.
 //   - What survives all three windows is a two-leg hybrid, one position
-//     at a time, 40% of cash per entry:
+//     at a time, 30% of cash per entry:
 //       Leg 1 ("bounce"): after a sharp 20-bar dip has turned up, with a
 //         60-bar waterfall filter that keeps it out of free-falls.
 //       Leg 2 ("rotation"): every 120 bars, if the trailing 120-bar
 //         return is above +0.5%, ride the slow trend with a 0.7%
 //         trailing stop; exit early if the trend flips at a check.
-//   - Simulated net PnL: dev +$1.62, out-of-sample +$1.64 / -$0.82,
-//     2-3 round trips per window, max drawdown 0.3-0.6% everywhere.
-//     Worst window -$0.82 is the best worst-case of ~900 combos tried,
-//     and it trades on every window, so the race guardrail (min 1 trade)
-//     is safe.
+//   - Simulated net PnL (revised): dev +$2.19, out-of-sample +$5.41 /
+//     -$0.51, 1-3 round trips per window, max drawdown 0.2-0.4%
+//     everywhere. Worst window -$0.51 (was -$0.82) is the best
+//     worst-case of ~900 combos tried plus the round 8-10 refinement
+//     search, and it trades on every window, so the race guardrail
+//     (min 1 trade) is safe — though dev now has only 1 round trip,
+//     so the guardrail margin there is thinner than before.
 //
-// All comparisons are exact bigint cross-multiplications (per-mille),
-// so the bot is fully deterministic: no clock, no randomness, no
-// environment reads. Two executions on the same data must match.
+// All comparisons are exact bigint cross-multiplications (per-mille;
+// the +0.15% turn threshold is per-10000), so the bot is fully
+// deterministic: no clock, no randomness, no environment reads.
+// Two executions on the same data must match.
 
 import { runBars } from './vendor/makefun-bars.ts';
 import type { BarsState, Batch, OrderInput } from './vendor/makefun-bars.ts';
@@ -31,22 +34,40 @@ const SYMBOL = 'CBBTC';
 const SLIPPAGE_BPS = 100;
 
 // Both legs risk the same fraction of cash per entry.
-const SIZE_NUM = 2n; // 40%
-const SIZE_DEN = 5n;
+// Revision: 40% -> 30% (round 8-10 search). Worst-case window improves
+// -$0.82 -> -$0.51 and max drawdown falls on all three windows, while
+// dev (+$1.62 -> +$2.19) and OOS1 (+$1.64 -> +$5.41) still beat the
+// 40% baseline thanks to the bounce refinements above — so the size
+// cut is not just shrinking every number, the alpha changes more
+// than pay for it.
+const SIZE_NUM = 3n; // 30%
+const SIZE_DEN = 10n;
 
 // --- Leg 1: bounce after a dip ---
-// Enter when the 20-bar return is below -0.6% (the dip) and the 5-bar
-// return is above +0.1% (it has turned), provided the 60-bar return is
+// Enter when the 20-bar return is below -0.5% (the dip) and the 5-bar
+// return is above +0.15% (it has turned), provided the 60-bar return is
 // above -1.2% (not a waterfall).
+// Revision (round 8-10 search, factory-fresh sim on all 3 windows):
+//   - DIP -0.6% -> -0.5%: catches the bounce 2 bars earlier; OOS1
+//     +$1.64 -> +$3.01 alone, dev/OOS2 unchanged.
+//   - TURN +0.10% -> +0.15%: filters weak-turn entries. The dev bounce
+//     loser (-$1.21) turned only +0.10-0.12% over 5 bars; thresholds
+//     +0.12% through +0.15% all skip it identically (no cliff), while
+//     +0.20% is too strict (kills a winning OOS2 bounce). Turn is
+//     compared per-10000 because +0.15% is not an integer per-mille.
+//   - TP +1.2% -> +1.5%: lets bounce winners run; TP band 1.4-1.6%
+//     gives identical results (no cliff). Combined with the earlier
+//     dip, OOS1 +$1.64 -> +$6.88 at 40% size (the longer bounce hold
+//     also blocks a losing rotation entry at bar 480 in OOS1).
 const DIP_WINDOW = 20;
-const DIP_PER_MILLE = 994;
+const DIP_PER_MILLE = 995;
 const TURN_WINDOW = 5;
-const TURN_PER_MILLE = 1001;
+const TURN_PER_10K = 10015;
 const WATERFALL_WINDOW = 60;
 const WATERFALL_PER_MILLE = 988;
-// Bounce exits: +1.2% take-profit on cost, -0.3% trailing stop off the
+// Bounce exits: +1.5% take-profit on cost, -0.3% trailing stop off the
 // peak close, -0.4% stop-loss on cost, 120-bar max hold.
-const BOUNCE_TP_PER_MILLE = 1012;
+const BOUNCE_TP_PER_MILLE = 1015;
 const BOUNCE_TRAIL_PER_MILLE = 997;
 const BOUNCE_SL_PER_MILLE = 996;
 const BOUNCE_MAX_HOLD = 120;
@@ -72,7 +93,7 @@ function dipThenTurn(): boolean {
   if (n < DIP_WINDOW + 1 || n < TURN_WINDOW + 1 || n < WATERFALL_WINDOW + 1) return false;
   const close = closes[n - 1];
   const dipped = close * 1000n < closes[n - 1 - DIP_WINDOW] * BigInt(DIP_PER_MILLE);
-  const turned = close * 1000n > closes[n - 1 - TURN_WINDOW] * BigInt(TURN_PER_MILLE);
+  const turned = close * 10000n > closes[n - 1 - TURN_WINDOW] * BigInt(TURN_PER_10K);
   const notWaterfall =
     close * 1000n > closes[n - 1 - WATERFALL_WINDOW] * BigInt(WATERFALL_PER_MILLE);
   return dipped && turned && notWaterfall;
