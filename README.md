@@ -1,6 +1,10 @@
 # btc-race-20261117 — dual-leg cbBTC scalper
 
-Entry for make.fun `btc-race-24h-20261117-0603` ("Race a BTC trading bot
+[![make.fun · btc-race-24h-20261117-0603](https://make.fun/badge/btc-race-24h-20261117-0603.svg)](https://make.fun/bounty/btc-race-24h-20261117-0603?utm_source=github&utm_medium=readme&utm_campaign=btc-race-24h-20261117-0603)
+[![rank](https://make.fun/badge/btc-race-24h-20261117-0603/htyo00/btc-race-20261117/rank.svg)](https://make.fun/bounty/btc-race-24h-20261117-0603/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=btc-race-24h-20261117-0603)
+[![reward](https://make.fun/badge/btc-race-24h-20261117-0603/htyo00/btc-race-20261117/reward.svg)](https://make.fun/bounty/btc-race-24h-20261117-0603?utm_source=github&utm_medium=readme&utm_campaign=btc-race-24h-20261117-0603)
+
+Entry for make.fun [`btc-race-24h-20261117-0603`](https://make.fun/bounty/btc-race-24h-20261117-0603) ("Race a BTC trading bot
 live for 24 hours"). The bot trades Coinbase Wrapped BTC (cbBTC) against
 USDC, minute by minute, long-only, starting from $1,000 of paper money.
 
